@@ -19,7 +19,7 @@
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/yourusername/signoutsync.git
+    git clone https://github.com/brodante/signoutsync.git
     cd signoutsync
     ```
 
