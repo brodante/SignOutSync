@@ -47,15 +47,17 @@ def logout():
     # Check if the user is logged in
     if 'user' in session:
         username = session['user']
-        device = session['device']
+        device = session.get('device')  # Use .get() to safely access 'device' key
         user = users_db.get(username)
 
-        # Remove only the device from the user's active devices list
-        if user and device in user['devices']:
-            user['devices'].remove(device)
+        if not user:
+            return jsonify({"message": "User not found in the database!"}), 404
 
-        # Update user data in the database (if needed)
-        users_db[username] = user  # Save updated user data
+        # Remove only the device from the user's active devices list
+        if device and device in user.get('devices', []):
+            user['devices'].remove(device)
+            # Update user data in the database
+            users_db[username] = user  # Save updated user data
 
         # Remove only the device info from the session, but keep the session intact
         session.pop('device', None)
@@ -63,6 +65,7 @@ def logout():
         return jsonify({"message": f"Logged out from {device}"}), 200
     else:
         return jsonify({"message": "No active session found!"}), 401
+
 
 
 # View active devices
