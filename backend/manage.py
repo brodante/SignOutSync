@@ -1,11 +1,19 @@
 from flask import Flask, jsonify, request, session
 from datetime import timedelta
+import uuid
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # Set a strong secret key for session management
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)  # Set session lifetime to 30 mins
 
-# In-memory storage for users and sessions
+# Set a strong secret key for session management from environment variable
+app.secret_key = os.getenv('SECRET_KEY')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
+
+# In-memory storage for users and sessions (this is for demo purposes, replace with actual DB in production)
 users_db = {
     'testuser': {'password': 'password', 'devices': []}  # Example user
 }
@@ -15,63 +23,67 @@ users_db = {
 def index():
     return jsonify({"message": "SignOutSync Backend Running"}), 200
 
+# User authentication function
+def authenticate(username, password):
+    # Check if user exists in the users_db and the password matches
+    user = users_db.get(username)
+    if user and user['password'] == password:
+        return True
+    return False
+
 # User login route
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
-    username = data.get('username')
-    password = data.get('password')
 
-    # Check if user exists and password matches
-    user = users_db.get(username)
-    if user and user['password'] == password:
-        # Simulating device info (could be from request headers in real-world scenarios)
-        device = request.headers.get('User-Agent', 'Unknown device')
+    # Validate that both username and password are provided
+    if 'username' not in data or 'password' not in data:
+        return jsonify({"message": "Username and password are required!"}), 400
 
-        # Add device to user's active devices list
-        if device not in user['devices']:
-            user['devices'].append(device)
+    username = data['username']
+    password = data['password']
+    device = str(uuid.uuid4())  # Generate a unique device identifier
 
-        # Create session for the user
+    # Perform authentication
+    if authenticate(username, password):
         session['user'] = username
-        session['device'] = device
-        session.permanent = True  # Session will persist for the duration set in config
+        session['device'] = device  # Store the unique device identifier in the session
+        session.permanent = True  # Mark the session as permanent (honors session lifetime)
 
-        return jsonify({"message": f"Logged in as {username} from {device}"}), 200
+        # Add the device to the user's devices list in the database
+        user = users_db.get(username)
+        user['devices'].append(device)  # Append new device to user's devices list
+
+        return jsonify({"message": f"Logged in on device {device}"}), 200
     else:
         return jsonify({"message": "Invalid credentials!"}), 401
 
 # User logout route
 @app.route('/logout', methods=['POST'])
 def logout():
-    # Check if the user is logged in
-    if 'user' in session:
+    if 'user' in session and 'device' in session:
         username = session['user']
-        device = session.get('device')  # Use .get() to safely access 'device' key
+        device = session['device']  # Get the stored device identifier
         user = users_db.get(username)
 
         if not user:
             return jsonify({"message": "User not found in the database!"}), 404
 
-        # Remove only the device from the user's active devices list
-        if device and device in user.get('devices', []):
+        # Remove the device from the user's devices list
+        if device in user.get('devices', []):
             user['devices'].remove(device)
-            # Update user data in the database
-            users_db[username] = user  # Save updated user data
 
-        # Remove only the device info from the session, but keep the session intact
+        # Clean up the session for the current device
         session.pop('device', None)
+        session.pop('user', None)
 
-        return jsonify({"message": f"Logged out from {device}"}), 200
+        return jsonify({"message": f"Logged out from device {device}"}), 200
     else:
         return jsonify({"message": "No active session found!"}), 401
-
-
 
 # View active devices
 @app.route('/devices', methods=['GET'])
 def view_devices():
-    # Check if user is logged in
     if 'user' in session:
         username = session['user']
         user = users_db.get(username)
