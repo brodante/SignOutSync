@@ -15,7 +15,7 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 
 # In-memory storage for users and sessions (this is for demo purposes, replace with actual DB in production)
 users_db = {
-    'testuser': {'password': 'password', 'devices': []}  # Example user
+    'testuser': {'password': os.getenv('TESTUSER_PASSWORD'), 'devices': []}  # Example user
 }
 
 # Basic status check route
