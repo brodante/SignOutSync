@@ -45,6 +45,7 @@ def login():
     device_name = data['device_name']
     device_id = str(uuid.uuid4())  # Generate a unique device identifier
     login_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Get current time
+    user_agent = request.headers.get('User-Agent')  # Get User-Agent from request headers
 
     # Perform authentication
     if authenticate(username, password):
@@ -54,9 +55,18 @@ def login():
 
         # Add the device to the user's devices list in the database
         user = users_db.get(username)
-        user['devices'].append({'device_id': device_id, 'device_name': device_name, 'login_time': login_time})  # Append new device to user's devices list
+        user['devices'].append({
+            'device_id': device_id,
+            'device_name': device_name,
+            'login_time': login_time,
+            'user_agent': user_agent
+        })  # Append new device to user's devices list
 
-        return jsonify({"message": f"Logged in from {device_name} at {login_time}"}), 200
+        return jsonify({
+            "message": f"Logged in from {device_name} at {login_time}",
+            "device_id": device_id,
+            "user_agent": user_agent
+        }), 200
     else:
         return jsonify({"message": "Invalid credentials!"}), 401
 
@@ -71,22 +81,36 @@ def logout():
         if not user:
             return jsonify({"message": "User not found in the database!"}), 404
 
-        # Remove the device from the user's devices list
-        user['devices'] = [device for device in user.get('devices', []) if device['device_id'] != device_id]
+        # Find the device in the user's devices list
+        device_info = next((device for device in user.get('devices', []) if device['device_id'] == device_id), None)
 
-        # Clean up the session for the current device
-        session.pop('device', None)
-        session.pop('user', None)
+        if device_info:
+            device_name = device_info['device_name']
+            user_agent = device_info['user_agent']
+            logout_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Get current time
 
-        return jsonify({"message": f"Logged out from device {device_id}"}), 200
+            # Remove the device from the user's devices list
+            user['devices'] = [device for device in user.get('devices', []) if device['device_id'] != device_id]
+
+            # Clean up the session for the current device
+            session.pop('device', None)
+            session.pop('user', None)
+
+            return jsonify({
+                "message": f"Logged out from {device_name} at {logout_time}",
+                "device_id": device_id,
+                "user_agent": user_agent
+            }), 200
+        else:
+            return jsonify({"message": "Device not found!"}), 404
     else:
         return jsonify({"message": "No active session found!"}), 401
 
 # View active devices
 @app.route('/devices', methods=['GET'])
 def view_devices():
-    if 'user' in session:
-        username = session['user']
+    username = request.args.get('username')
+    if username:
         user = users_db.get(username)
         if user:
             return jsonify({"devices": user['devices']}), 200
