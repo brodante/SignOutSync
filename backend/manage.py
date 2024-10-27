@@ -15,8 +15,28 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 
 # In-memory storage for users and sessions (this is for demo purposes, replace with actual DB in production)
 users_db = {
-    'testuser': {'password': os.getenv('TESTUSER_PASSWORD'), 'devices': []}  # Example user
+    'testuser': {'password': os.getenv('TESTUSER_PASSWORD'), 'devices': [
+        {
+            'device_id': 'device1',
+            'device_name': 'User’s iPhone',
+            'login_time': '2024-10-28 12:30:00',
+            'user_agent': 'iPhone User-Agent'
+        },
+        {
+            'device_id': 'device2',
+            'device_name': 'User’s iPad',
+            'login_time': '2024-10-28 13:00:00',
+            'user_agent': 'iPad User-Agent'
+        },
+        {
+            'device_id': 'device3',
+            'device_name': 'User’s Laptop',
+            'login_time': '2024-10-28 13:30:00',
+            'user_agent': 'Laptop User-Agent'
+        }
+    ]}
 }
+
 
 # Basic status check route
 @app.route('/')
@@ -78,23 +98,37 @@ def logout():
         if not user:
             return jsonify({"message": "User not found in the database!"}), 404
 
-        # Retrieve the most recent device from the session
-        most_recent_device_id = session.get('device')
+        # Get device_id from the request JSON to specify which device to log out
+        data = request.json
+        device_id = data.get("device_id")
 
-        # Keep only the most recent device in the user's devices list
-        user['devices'] = [device for device in user.get('devices', []) if device['device_id'] == most_recent_device_id]
+        if not device_id:
+            return jsonify({"message": "Device ID is required for logout!"}), 400
 
-        # Prepare response message
-        logout_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        session.pop('user', None)
-        session.pop('device', None)  # Clear session
+        # Find the device in the user's devices list
+        device_info = next((device for device in user.get('devices', []) if device['device_id'] == device_id), None)
 
-        return jsonify({
-            "message": f"Logged out all devices except the most recent one at {logout_time}",
-            "remaining_device": user['devices']
-        }), 200
+        if device_info:
+            device_name = device_info['device_name']
+            logout_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Get current time
+
+            # Remove only the targeted device from the user's devices list
+            user['devices'] = [device for device in user.get('devices', []) if device['device_id'] != device_id]
+
+            # Clean up the session only if it matches the current device being logged out
+            if session.get('device') == device_id:
+                session.pop('device', None)
+                session.pop('user', None)
+
+            return jsonify({
+                "message": f"Logged out from {device_name} at {logout_time}",
+                "device_id": device_id
+            }), 200
+        else:
+            return jsonify({"message": "Device not found!"}), 404
     else:
         return jsonify({"message": "No active session found!"}), 401
+
 
 # View active devices
 @app.route('/devices', methods=['POST'])
