@@ -15,26 +15,7 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 
 # In-memory storage for users and sessions (this is for demo purposes, replace with actual DB in production)
 users_db = {
-    'testuser': {'password': os.getenv('TESTUSER_PASSWORD'), 'devices': [
-        {
-            'device_id': 'device1',
-            'device_name': 'User’s iPhone',
-            'login_time': '2024-10-28 12:30:00',
-            'user_agent': 'iPhone User-Agent'
-        },
-        {
-            'device_id': 'device2',
-            'device_name': 'User’s iPad',
-            'login_time': '2024-10-28 13:00:00',
-            'user_agent': 'iPad User-Agent'
-        },
-        {
-            'device_id': 'device3',
-            'device_name': 'User’s Laptop',
-            'login_time': '2024-10-28 13:30:00',
-            'user_agent': 'Laptop User-Agent'
-        }
-    ]}
+    'testuser': {'password': os.getenv('TESTUSER_PASSWORD'), 'devices': []}
 }
 
 
