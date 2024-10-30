@@ -13,28 +13,9 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 
-# In-memory storage for users and sessions (this is for demo purposes, replace with actual DB in production)
+# In-memory storage for users and sessions (for demo purposes, replace with an actual DB in production)
 users_db = {
-    'testuser': {'password': os.getenv('TESTUSER_PASSWORD'), 'devices': [
-        {
-            'device_id': 'device1',
-            'device_name': 'User’s iPhone',
-            'login_time': '2024-10-28 12:30:00',
-            'user_agent': 'iPhone User-Agent'
-        },
-        {
-            'device_id': 'device2',
-            'device_name': 'User’s iPad',
-            'login_time': '2024-10-28 13:00:00',
-            'user_agent': 'iPad User-Agent'
-        },
-        {
-            'device_id': 'device3',
-            'device_name': 'User’s Laptop',
-            'login_time': '2024-10-28 13:30:00',
-            'user_agent': 'Laptop User-Agent'
-        }
-    ]}
+    'testuser': {'password': os.getenv('TESTUSER_PASSWORD'), 'devices': []}
 }
 
 
@@ -88,6 +69,39 @@ def login():
     else:
         return jsonify({"message": "Invalid credentials!"}), 401
 
+# Password change route
+@app.route('/change_password', methods=['POST'])
+def change_password():
+    # Ensure the user is authenticated
+    if 'user' not in session:
+        return jsonify({"message": "User is not logged in!"}), 401
+
+    # Parse the request data
+    data = request.json
+    username = session['user']
+    old_password = data.get('old_password')
+    new_password = data.get('new_password')
+
+    if not old_password or not new_password:
+        return jsonify({"message": "Old password and new password are required!"}), 400
+
+    # Verify old password
+    user = users_db.get(username)
+    if not user or user['password'] != old_password:
+        return jsonify({"message": "Incorrect old password!"}), 403
+
+    # Update the password
+    user['password'] = new_password
+
+    # Clear all active sessions (devices list)
+    user['devices'].clear()
+    
+    # Clear session to log out the current session as well
+    session.pop('user', None)
+    session.pop('device', None)
+
+    return jsonify({"message": "Password changed successfully. All devices have been logged out."}), 200
+
 # User logout route to keep only the most recent device
 @app.route('/logout', methods=['POST'])
 def logout():
@@ -128,7 +142,6 @@ def logout():
             return jsonify({"message": "Device not found!"}), 404
     else:
         return jsonify({"message": "No active session found!"}), 401
-
 
 # View active devices
 @app.route('/devices', methods=['POST'])
