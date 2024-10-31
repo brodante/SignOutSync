@@ -14,9 +14,13 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 
+# Fetch username and password from environment variables
+USERNAME = os.getenv('TESTUSER_USERNAME')
+PASSWORD = os.getenv('TESTUSER_PASSWORD')
+
 # In-memory storage for users and sessions (for demo purposes, replace with an actual DB in production)
 users_db = {
-    'testuser': {'password': os.getenv('TESTUSER_PASSWORD'), 'devices': []}
+    USERNAME: {'password': PASSWORD, 'devices': []}
 }
 
 # Basic status check route
@@ -68,7 +72,7 @@ def login():
             "user_agent": user_agent
         }), 200
     else:
-        return jsonify({"message": "Invalid credentials!"}), 401
+        return jsonify({"message": "Username or Password incorrect!"}), 401
 
 # User logout route
 @app.route('/logout', methods=['POST'])
@@ -128,28 +132,31 @@ def change_password():
 
     # Parse the request data
     data = request.json
-    username = session['user']
+    username = data.get('username')
     old_password = data.get('old_password')
     new_password = data.get('new_password')
 
-    if not old_password or not new_password:
-        return jsonify({"message": "Old password and new password are required!"}), 400
+    if not username or not old_password or not new_password:
+        return jsonify({"message": "Username, old password, and new password are required!"}), 400
 
     user = users_db.get(username)
-    if user and user['password'] == old_password:
-        # Update the password in the in-memory database
-        user['password'] = new_password
+    if not user:
+        return jsonify({"message": "Username or Password incorrect!"}), 401
 
-        # Update the password in the .env file
-        set_key(env_path, 'TESTUSER_PASSWORD', new_password)
+    if user['password'] != old_password:
+        return jsonify({"message": "Old Password is incorrect!"}), 401
 
-        # Log out all devices
-        user['devices'] = []  # Clear the devices list
-        session.clear()  # Clear the session
+    # Update the password in the in-memory database
+    user['password'] = new_password
 
-        return jsonify({"message": "Password changed successfully and all devices logged out!"}), 200
-    else:
-        return jsonify({"message": "Old password is incorrect!"}), 401
+    # Update the password in the .env file
+    set_key(env_path, 'TESTUSER_PASSWORD', new_password)
+
+    # Log out all devices
+    user['devices'] = []  # Clear the devices list
+    session.clear()  # Clear the session
+
+    return jsonify({"message": "Password changed successfully and all devices logged out!"}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
