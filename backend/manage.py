@@ -31,7 +31,43 @@ def authenticate(username, password):
         return True
     return False
 
-    #login logic here
+    # User login route
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+
+    # Validate that both username, password, and device name are provided
+    if 'username' not in data or 'password' not in data or 'device_name' not in data:
+        return jsonify({"message": "Username, password, and device name are required!"}), 400
+
+    username = data['username']
+    password = data['password']
+    device_name = data['device_name']
+    device_id = str(uuid.uuid4())  # Generate a unique device identifier
+    login_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Get current time
+    user_agent = request.headers.get('User-Agent')  # Get User-Agent from request headers
+
+    # Perform authentication
+    if authenticate(username, password):
+        session['user'] = username
+        session['device'] = device_id  # Store current device ID in the session
+        session.permanent = True  # Mark the session as permanent (honors session lifetime)
+
+        # Add the device to the user's devices list in the database
+        user = users_db.get(username)
+        user['devices'].append({
+            'device_id': device_id,
+            'device_name': device_name,
+            'login_time': login_time,
+            'user_agent': user_agent
+        })  # Append new device to user's devices list
+        return jsonify({
+            "message": f"Logged in from {device_name} at {login_time}",
+            "device_id": device_id,
+            "user_agent": user_agent
+        }), 200
+    else:
+        return jsonify({"message": "Invalid credentials!"}), 401
 
 
 # Password change route
