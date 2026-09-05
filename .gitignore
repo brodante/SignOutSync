@@ -1,1 +1,6 @@
-Nothing to output - the file changes contain only a modified README.md file, which is a source/config file, and there are no build artifacts, dependencies, or temp files that need to be ignored.
+```
+# Environment variables
+.env
+.env.local
+.env.*
+```
